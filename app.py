@@ -137,7 +137,7 @@ def partybot_submit(ack: Ack, respond: Respond, command: dict, client: WebClient
     global known_candidates
     canonical_name = canonicalize_name(candidate_name)
     if canonical_name in known_candidates.values():
-        respond(text=f"Sorry, candidate *{candidate_name}* is already in Lever 😐")
+        respond(text=f"Sorry, candidate *{candidate_name}* is already in candidate pool 😐")
         return
 
     global submitted_candidates
