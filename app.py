@@ -21,14 +21,13 @@ log.logging_level = log.INFO
 
 load_dotenv()
 
-SLACK_BOT_TOKEN = os.getenv("SLACK_BOT_TOKEN")
-SLACK_APP_TOKEN = os.getenv("SLACK_APP_TOKEN")
+SLACK_BOT_TOKEN = os.getenv("SLACK_BOT_TOKEN").strip()
+SLACK_APP_TOKEN = os.getenv("SLACK_APP_TOKEN").strip()
 
 KNOWN_CANDIDATES_YAML = Path(__file__).absolute().parent.joinpath("data", "known_candidates.yaml")
 OPEN_POSITIONS_YAML = Path(__file__).absolute().parent.joinpath("data", "open_positions.yaml")
 PARTY_LEADS_FILE_PATH = Path(__file__).absolute().parent.joinpath("data", "leads", "leads.yaml")
 MAX_COMMAND_LENGTH = 2 ** 8
-CANDIDATE_LIMIT = 9
 
 app = App(token=SLACK_BOT_TOKEN)  # initializes your app with your bot token and socket mode handler
 
@@ -64,7 +63,7 @@ def canonicalize_name(name):
 
 with open(KNOWN_CANDIDATES_YAML, "r") as fp:
     try:
-        known_candidates = {candidate: canonicalize_name(candidate) for candidate in yaml.safe_load(fp)}
+        known_candidates = {candidate: canonicalize_name(candidate) for candidate in (yaml.safe_load(fp) or [])}
     except yaml.YAMLError as e:
         log.warn(f"Error '{e}' parsing list of known candidates '{KNOWN_CANDIDATES_YAML}'. "
                  f"Known candidates list will be empty.")
@@ -131,7 +130,7 @@ def partybot_submit(ack: Ack, respond: Respond, command: dict, client: WebClient
                      f"I hope you know what you're doing.")
 
     if not candidate_name:
-        respond(text=f"Empty candidate name submitted. Please see /partybot-submit syntax")
+        respond(text="Empty candidate name submitted. Please see /partybot-submit syntax")
         return
 
     global known_candidates
@@ -235,8 +234,7 @@ def save():
         submissions = []
         for submissions_by_positions in done_submissions_by_user.values():
             for submissions_by_name in submissions_by_positions.values():
-                for submission in submissions_by_name.values():
-                    submissions.append(vars(submission))
+                submissions.extend(vars(submission) for submission in submissions_by_name.values())
 
         with open(str(PARTY_LEADS_FILE_PATH), "w") as fp:
             yaml.safe_dump(submissions, fp)
@@ -252,12 +250,6 @@ def pick_position(ack: Ack, body: dict, client: WebClient):
     user_id = body["user"]["id"]
     user_name = body["user"]["username"]
     position = body["actions"][0]["selected_option"]["text"]["text"]
-
-    if len(done_submissions_by_user[user_name][position]) >= CANDIDATE_LIMIT:
-        client.chat_postMessage(channel=user_id,
-                                text=f"You've reached your limit of submissions for the *{position}* position. "
-                                     f"Please contact the Party manager if you must submit.")
-        return
 
     submission = submissions_by_token.get(token)
     if not submission:
